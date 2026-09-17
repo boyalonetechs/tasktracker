@@ -1,0 +1,101 @@
+from django.db import models
+from django.contrib.auth.hashers import make_password, check_password
+from django.utils import timezone
+# Create your models here.
+class Admin(models.Model):
+    Name=models.CharField(max_length=256,null=True)
+    Email=models.EmailField(null=True)
+    password=models.CharField(max_length=256, null=True)
+    auth=models.CharField(null=True,blank=True)
+
+    def save(self, *args, **kwargs):
+        if self.password and not self.password.startswith('pbkdf2_'):
+            self.password = make_password(self.password)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Admin: {self.Name or 'Unnamed'}"
+
+################################################## staff
+class Staff(models.Model):
+    Name=models.CharField(max_length=256,null=True)
+    Email=models.EmailField(null=True)
+    dpt=models.CharField(max_length=100,null=True)
+    role=models.CharField(max_length=20, default='staff')
+    auth=models.CharField(null=True)
+    refresh=models.CharField(null=True)
+    password=models.CharField(null=True)
+    photo=models.URLField(null=True,blank=True)
+    auth_created_at=models.DateTimeField(null=True,blank=True)
+    auth_expire_at=models.DateTimeField(null=True,blank=True)
+    refresh_created_at=models.DateTimeField(null=True,blank=True)
+    refresh_expire_at=models.DateTimeField(null=True,blank=True)
+    def expire_auth(self):
+        return self.auth_expire_at and timezone.now() > self.auth_expire_at
+        
+    def expire_refresh(self):
+        return self.refresh_expire_at and timezone.now() > self.refresh_expire_at
+    def __str__(self):
+        return f"{str(self.Name)} with the Email {str(self.Email)} stays in {str(self.dpt)}"
+        
+class DirectorsTask(models.Model):
+    staff=models.ForeignKey(Staff,on_delete=models.SET_NULL,related_name="director_tasks",null=True)
+    task=models.TextField(null=True)
+    description=models.TextField(null=True,blank=True)
+    date=models.DateField(null=True,auto_now=True)
+    status=models.CharField(null=True,default="In progress")
+                            
+    def __str__(self):
+    #
+        if self.staff:
+            return f"{str(self.staff.Name)} Task Done on {str(self.date)}"
+        
+    
+        return f"Unassigned Task Done on {str(self.date)}"    
+    
+####################################################### task
+    
+class Task(models.Model):
+    staff=models.ForeignKey(Staff,on_delete=models.SET_NULL,related_name="task",null=True)
+    group=models.ForeignKey('self',related_name="subtasks",null=True,blank=True,on_delete=models.SET_NULL)
+    moved_from=models.ForeignKey('self',related_name="moves",null=True,blank=True,on_delete=models.SET_NULL)
+    number=models.IntegerField(null=True,blank=True)
+    task=models.TextField(null=True)
+    description=models.TextField(null=True,blank=True)
+    date=models.DateField(null=True,auto_now_add=True)
+    status=models.CharField(null=True,default="In progress")
+    completion_date=models.DateField(null=True,blank=True)
+    progress=models.CharField(null=True,blank=True,max_length=10)
+                            
+    def __str__(self):
+    #
+        if self.staff:
+            return f"{str(self.staff.Name)} Task Done on {str(self.date)}"
+        
+    
+        return f"Unassigned Task Done on {str(self.date)}"
+    
+
+class PasswordResetOTP(models.Model):
+    email = models.EmailField()
+    otp = models.CharField(max_length=6)
+    reset_token = models.CharField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    is_used = models.BooleanField(default=False)
+
+    def is_expired(self):
+        return timezone.now() > self.expires_at
+
+    def __str__(self):
+        return f"OTP for {self.email} - {'Used' if self.is_used else 'Pending'}"
+    
+class Arrival(models.Model):
+    staff=models.ForeignKey(Staff,related_name="staff_arrival",on_delete=models.CASCADE)
+    time_of_arrival=models.TimeField(null=True)
+    date=models.DateField(null=True)
+    day=models.CharField(null=True)
+    time_of_leave=models.TimeField(null=True)
+
+    def __str__(self):
+        return f" {self.staff} arrived at {self.time_of_arrival} on {self.day} and left on {self.time_of_leave}"
