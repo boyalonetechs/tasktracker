@@ -148,4 +148,5 @@ else:
         if o.strip()
     ]
 STATIC_URL="static/"
-STATIC_ROOT=os.path.join(BASE_DIR/STATIC_URL)
+STATIC_ROOT=BASE_DIR / 'staticfiles'
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"

@@ -1,0 +1,43 @@
+# Render Blueprint for the Django backend.
+# Use with the Preview Environment / Blueprint flow, or as a reference.
+services:
+  - type: web
+    name: tasktracker-backend
+    runtime: python
+    plan: free
+    rootDir: backend
+    healthCheckPath: /api/account/settings/
+    envVars:
+      - key: DEBUG
+        value: "False"
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: CSRF_TRUSTED_ORIGINS
+        sync: false
+      - key: DB_ENGINE
+        value: "django.db.backends.postgresql"
+        sync: false
+      - key: DB_NAME
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: "5432"
+        sync: false
+      - key: DB_SSLMODE
+        value: "require"
+        sync: false
+      - key: DB_CHANNEL_BINDING
+        value: "require"
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false

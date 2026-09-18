@@ -161,8 +161,30 @@ Auth uses a bearer token (`Authorization: Bearer <token>`, stored as `auth_token
 
 ## Deploying
 
-- **API**: `gunicorn` with Whitenoise — `python manage.py collectstatic --noinput`, then `gunicorn Tracker.wsgi --bind 0.0.0.0:8000`. Add the deployed origin to `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, and `ALLOWED_HOSTS` in `.env`.
-- **Web**: Vercel — set `NEXT_PUBLIC_API_BASE_URL` to the deployed API URL.
+- **API → Render** (Django / gunicorn / Whitenoise). Deploy via the
+  [`backend/render.yaml`](backend/render.yaml) Blueprint, or a manual **Web Service**:
+
+  | Setting                 | Value                                             |
+  |-------------------------|---------------------------------------------------|
+  | Root directory          | `backend`                                         |
+  | Environment             | Python                                            |
+  | Build command           | `bash build.sh`                                   |
+  | Start command           | `gunicorn Tracker.wsgi:application --bind 0.0.0.0:$PORT` |
+  | Instance type           | Free / Starter                                     |
+
+  Runtime env vars in `render.yaml` (fill in the *sync: false* ones):
+  `SECRET_KEY` (auto-generate), `ALLOWED_HOSTS`, `DEBUG=False`,
+  `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS` (add your `${RENDER_EXTERNAL_URL}`
+  + Vercel origin), and the Neon `DB_*` set (`DB_NAME`, `DB_USER`, `DB_PASSWORD`,
+  `DB_HOST`, `DB_PORT`, `DB_SSLMODE`, `DB_CHANNEL_BINDING`, `DB_ENGINE`).
+
+  Migrations + `collectstatic` run automatically in `build.sh`; static assets are
+  served by Whitenoise.
+
+- **Web → Vercel** (Next.js). In the project, set
+  `NEXT_PUBLIC_API_BASE_URL` to the deployed Render origin (e.g.
+  `https://your-app.onrender.com`) in the Vercel environment for Production.
+
 - **DB**: any PostgreSQL (the repo ships with Neon-friendly settings).
 
 ## Repository hygiene
