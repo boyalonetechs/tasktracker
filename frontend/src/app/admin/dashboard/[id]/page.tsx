@@ -13,8 +13,9 @@ import {
   Calendar,
   CalendarCheck,
   Loader,
+  Settings,
 } from "lucide-react";
-import { api, logout, formatDate } from "@/lib/api";
+import { api, logout, formatDate, isAuthError } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 
@@ -60,6 +61,8 @@ export default function StaffProfilePage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [displayName, setDisplayName] = useState("Admin");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [adminPhoto, setAdminPhoto] = useState<string | null>(null);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState("");
@@ -76,10 +79,7 @@ export default function StaffProfilePage({
         setTasks(data.tasks || []);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (err: any) {
-        if (
-          err.message?.includes("Authenticate") ||
-          err.message?.includes("credentials")
-        ) {
+        if (isAuthError(err)) {
           router.push("/login");
           return;
         }
@@ -91,6 +91,28 @@ export default function StaffProfilePage({
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  useEffect(() => {
+    api
+      .getAccountSettings()
+      .then((res) => {
+        if (res?.name) {
+          setDisplayName(res.name);
+          localStorage.setItem("user_name", res.name);
+        }
+        if (res?.photo) {
+          setAdminPhoto(res.photo);
+          localStorage.setItem("user_photo", res.photo);
+        }
+      })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .catch((err: any) => {
+        if (isAuthError(err)) {
+          router.push("/login");
+        }
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const getInitials = (name: string) => {
     if (!name) return "?";
@@ -198,6 +220,16 @@ export default function StaffProfilePage({
                 <CalendarCheck className="w-4 h-4" />
                 Attendance
               </button>
+              <button
+                onClick={() => {
+                  router.push("/admin/settings");
+                  setSidebarOpen(false);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-sm transition-all text-gray-500 hover:bg-gray-50"
+              >
+                <Settings className="w-4 h-4" />
+                Settings
+              </button>
             </nav>
           </div>
 
@@ -231,8 +263,17 @@ export default function StaffProfilePage({
             </div>
 
             <div className="flex items-center gap-2.5 pl-2">
-              <div className="w-9 h-9 rounded-full bg-[#003A47] flex items-center justify-center text-xs font-bold text-white uppercase">
-                {getInitials(displayName)}
+              <div className="w-9 h-9 rounded-full bg-[#003A47] flex items-center justify-center text-xs font-bold text-white uppercase overflow-hidden">
+                {adminPhoto ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={adminPhoto}
+                    alt={displayName}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  getInitials(displayName)
+                )}
               </div>
               <span className="text-sm font-semibold text-gray-800 max-sm:hidden">
                 {displayName}

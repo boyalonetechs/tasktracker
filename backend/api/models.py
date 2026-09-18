@@ -7,6 +7,8 @@ class Admin(models.Model):
     Email=models.EmailField(null=True)
     password=models.CharField(max_length=256, null=True)
     auth=models.CharField(null=True,blank=True)
+    photo=models.URLField(null=True,blank=True)
+    settings_completed=models.BooleanField(default=False)
 
     def save(self, *args, **kwargs):
         if self.password and not self.password.startswith('pbkdf2_'):
@@ -30,6 +32,7 @@ class Staff(models.Model):
     auth_expire_at=models.DateTimeField(null=True,blank=True)
     refresh_created_at=models.DateTimeField(null=True,blank=True)
     refresh_expire_at=models.DateTimeField(null=True,blank=True)
+    settings_completed=models.BooleanField(default=False)
     def expire_auth(self):
         return self.auth_expire_at and timezone.now() > self.auth_expire_at
         
@@ -78,8 +81,9 @@ class Task(models.Model):
 
 class PasswordResetOTP(models.Model):
     email = models.EmailField()
-    otp = models.CharField(max_length=6)
+    otp = models.CharField(max_length=64)
     reset_token = models.CharField(null=True, blank=True)
+    attempts = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
     is_used = models.BooleanField(default=False)

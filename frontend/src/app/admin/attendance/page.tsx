@@ -14,7 +14,7 @@ import {
   Search,
   X,
 } from "lucide-react";
-import { api, logout, formatDate } from "@/lib/api";
+import { api, logout, formatDate, isAuthError } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 
@@ -24,6 +24,8 @@ export default function AdminAttendance() {
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [displayName, setDisplayName] = useState("Admin");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [adminPhoto, setAdminPhoto] = useState<string | null>(null);
   const [attDate, setAttDate] = useState("");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [history, setHistory] = useState<any[]>([]);
@@ -41,7 +43,17 @@ export default function AdminAttendance() {
         const data = await api.getStaffList(
           attDate ? { date: attDate } : undefined,
         );
-        if (data.staff_list) setEmployees(data.staff_list);
+        if (data.staff_list) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const sorted = [...data.staff_list].sort((a: any, b: any) => {
+            const an = (a.Name || "").trim();
+            const bn = (b.Name || "").trim();
+            if (!an) return 1;
+            if (!bn) return -1;
+            return an.localeCompare(bn, undefined, { sensitivity: "base" });
+          });
+          setEmployees(sorted);
+        }
         if (data.name) {
           setDisplayName(data.name);
           localStorage.setItem("user_name", data.name);
@@ -49,10 +61,7 @@ export default function AdminAttendance() {
         if (!attDate && data.date) setAttDate(data.date);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (err: any) {
-        if (
-          err.message?.includes("Authenticate") ||
-          err.message?.includes("credentials")
-        ) {
+        if (isAuthError(err)) {
           router.push("/login");
         }
       } finally {
@@ -64,16 +73,35 @@ export default function AdminAttendance() {
   }, [attDate]);
 
   useEffect(() => {
+    api
+      .getAccountSettings()
+      .then((res) => {
+        if (res?.name) {
+          setDisplayName(res.name);
+          localStorage.setItem("user_name", res.name);
+        }
+        if (res?.photo) {
+          setAdminPhoto(res.photo);
+          localStorage.setItem("user_photo", res.photo);
+        }
+      })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .catch((err: any) => {
+        if (isAuthError(err)) {
+          router.push("/login");
+        }
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     const loadHistory = async () => {
       try {
         const data = await api.getAdminAttendanceHistory();
         if (data.records) setHistory(data.records);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (err: any) {
-        if (
-          err.message?.includes("Authenticate") ||
-          err.message?.includes("credentials")
-        ) {
+        if (isAuthError(err)) {
           router.push("/login");
         }
       } finally {
@@ -221,8 +249,17 @@ export default function AdminAttendance() {
             </div>
 
             <div className="flex items-center gap-2.5 pl-2">
-              <div className="w-9 h-9 rounded-full bg-[#003A47] flex items-center justify-center text-xs font-bold text-white uppercase">
-                {getInitials(displayName)}
+              <div className="w-9 h-9 rounded-full bg-[#003A47] flex items-center justify-center text-xs font-bold text-white uppercase overflow-hidden">
+                {adminPhoto ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={adminPhoto}
+                    alt={displayName}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  getInitials(displayName)
+                )}
               </div>
               <span className="text-sm font-semibold text-gray-800 max-sm:hidden">
                 {displayName}

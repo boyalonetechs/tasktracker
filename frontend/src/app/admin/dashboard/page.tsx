@@ -9,10 +9,12 @@ import {
   Loader,
   Calendar,
   CalendarCheck,
+  Settings,
 } from "lucide-react";
-import { api, logout } from "@/lib/api";
+import { api, logout, isAuthError } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
+import FirstLoginModal from "@/components/FirstLoginModal";
 
 export default function AdminDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -21,7 +23,12 @@ export default function AdminDashboard() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [displayName, setDisplayName] = useState("Admin");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [adminPhoto, setAdminPhoto] = useState<string | null>(null);
   const [attDate, setAttDate] = useState("");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [accountSettings, setAccountSettings] = useState<any>(null);
+  const [showFirstLogin, setShowFirstLogin] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -34,7 +41,15 @@ export default function AdminDashboard() {
           attDate ? { date: attDate } : undefined,
         );
         if (data.staff_list) {
-          setEmployees(data.staff_list);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const sorted = [...data.staff_list].sort((a: any, b: any) => {
+            const an = (a.Name || "").trim();
+            const bn = (b.Name || "").trim();
+            if (!an) return 1;
+            if (!bn) return -1;
+            return an.localeCompare(bn, undefined, { sensitivity: "base" });
+          });
+          setEmployees(sorted);
         }
         if (data.name) {
           setDisplayName(data.name);
@@ -43,10 +58,7 @@ export default function AdminDashboard() {
         if (!attDate && data.date) setAttDate(data.date);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (err: any) {
-        if (
-          err.message?.includes("Authenticate") ||
-          err.message?.includes("credentials")
-        ) {
+        if (isAuthError(err)) {
           router.push("/login");
         }
       } finally {
@@ -56,6 +68,32 @@ export default function AdminDashboard() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attDate]);
+
+  useEffect(() => {
+    api
+      .getAccountSettings()
+      .then((res) => {
+        setAccountSettings(res);
+        if (res && res.settings_completed === false) {
+          setShowFirstLogin(true);
+        }
+        if (res?.name) {
+          setDisplayName(res.name);
+          localStorage.setItem("user_name", res.name);
+        }
+        if (res?.photo) {
+          setAdminPhoto(res.photo);
+          localStorage.setItem("user_photo", res.photo);
+        }
+      })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .catch((err: any) => {
+        if (isAuthError(err)) {
+          router.push("/login");
+        }
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const getInitials = (name: string) => {
     if (!name) return "?";
@@ -131,6 +169,13 @@ export default function AdminDashboard() {
                 <CalendarCheck className="w-4 h-4" />
                 Attendance
               </button>
+              <button
+                onClick={() => router.push("/admin/settings")}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-sm transition-all text-gray-500 hover:bg-gray-50"
+              >
+                <Settings className="w-4 h-4" />
+                Settings
+              </button>
             </nav>
           </div>
 
@@ -165,8 +210,17 @@ export default function AdminDashboard() {
             </div>
 
             <div className="flex items-center gap-2.5 pl-2">
-              <div className="w-9 h-9 rounded-full bg-[#003A47] flex items-center justify-center text-xs font-bold text-white uppercase">
-                {getInitials(displayName)}
+              <div className="w-9 h-9 rounded-full bg-[#003A47] flex items-center justify-center text-xs font-bold text-white uppercase overflow-hidden">
+                {adminPhoto ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={adminPhoto}
+                    alt={displayName}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  getInitials(displayName)
+                )}
               </div>
               <span className="text-sm font-semibold text-gray-800 max-sm:hidden">
                 {displayName}
@@ -338,6 +392,23 @@ export default function AdminDashboard() {
           </main>
         </div>
       </div>
+
+      <FirstLoginModal
+        open={showFirstLogin}
+        kind="admin"
+        initial={accountSettings}
+        onComplete={(data) => {
+          setShowFirstLogin(false);
+          if (data.name) {
+            setDisplayName(data.name);
+            localStorage.setItem("user_name", data.name);
+          }
+          if (data.photo) {
+            setAdminPhoto(data.photo);
+            localStorage.setItem("user_photo", data.photo);
+          }
+        }}
+      />
     </AuthGuard>
   );
 }

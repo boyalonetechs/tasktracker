@@ -1,9 +1,4 @@
-const API_BASE =
-  (
-    globalThis as typeof globalThis & {
-      process?: { env?: { NEXT_PUBLIC_API_BASE_URL?: string } };
-    }
-  ).process?.env?.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function request<T = any>(
@@ -42,20 +37,21 @@ async function request<T = any>(
   }
 
   if (!res.ok) {
-    if (
-      typeof window !== "undefined" &&
+    const isAuth =
       typeof data.info === "string" &&
-      (data.info.includes("Authenticate") ||
-        data.info.includes("credentials") ||
-        data.info.includes("expired"))
-    ) {
+      /Authenticate|credentials|expired|login again|no admin found/i.test(
+        data.info,
+      );
+    if (isAuth && typeof window !== "undefined") {
       localStorage.removeItem("auth_token");
     }
-    throw new Error(
+    const err = new Error(
       typeof data.info === "string"
         ? data.info
         : `Request failed with status ${res.status}`,
-    );
+    ) as Error & { auth?: boolean };
+    err.auth = isAuth;
+    throw err;
   }
 
   const authHeader = res.headers.get("Authorization");
@@ -241,6 +237,24 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ email, token, password }),
     }),
+
+  getAccountSettings: () =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any>("/account/settings/", { method: "GET" }),
+
+  completeSettings: (body: {
+    name?: string;
+    email?: string;
+    dept?: string;
+    role?: string;
+    photo?: string;
+    password?: string;
+  }) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    request<any>("/account/settings/", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 };
 
 const MONTHS = [
@@ -284,11 +298,26 @@ export function formatDate(dateStr: string | null | undefined): string {
   return `${ordinal(day)} ${MONTHS[month - 1]} ${year}`;
 }
 
+export function isAuthError(err: unknown): boolean {
+  if (err && typeof err === "object" && "auth" in err && (err as { auth?: boolean }).auth) {
+    return true;
+  }
+  if (err instanceof Error) {
+    return /Authenticate|credentials|expired|login again|no admin found/i.test(
+      err.message,
+    );
+  }
+  return false;
+}
+
 export function logout() {
   if (typeof window !== "undefined") {
     localStorage.removeItem("auth_token");
     localStorage.removeItem("user_role");
     localStorage.removeItem("user_name");
     localStorage.removeItem("user_dept");
+    localStorage.removeItem("user_is_admin");
+    localStorage.removeItem("user_email");
+    localStorage.removeItem("user_photo");
   }
 }

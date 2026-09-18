@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import { Camera, Loader } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, isAuthError } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import EmployeeShell from "@/components/EmployeeShell";
@@ -48,11 +48,7 @@ export default function SettingsPage() {
         localStorage.setItem("user_photo", res.photo || "");
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (err: any) {
-        if (
-          err.message?.includes("Authenticate") ||
-          err.message?.includes("credentials") ||
-          err.message?.includes("expired")
-        ) {
+        if (isAuthError(err)) {
           router.push("/login");
         } else {
           setError(err.message || "Failed to load your profile.");
@@ -140,7 +136,7 @@ export default function SettingsPage() {
       >
         {loading ? (
           <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-400 text-sm">
-            Loading settings...
+            <Loader className="animate-spin mx-auto mb-2" />
           </div>
         ) : (
           <section className="bg-white rounded-xl border border-gray-200 overflow-hidden">

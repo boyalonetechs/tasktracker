@@ -5,7 +5,7 @@ from rest_framework import serializers
 class AdminSerializer(ModelSerializer):
     class Meta:
         model=Admin
-        fields="__all__"
+        fields=["id","Name","Email","photo","settings_completed"]
 
 class SignupSerializer(serializers.Serializer):
     dept=serializers.CharField(allow_null=True)
@@ -27,12 +27,13 @@ class AdminLoginSerializer(serializers.Serializer):
 class StaffSerializer(ModelSerializer):
     class Meta:
         model=Staff
-        fields="__all__"
-        
+        fields=["id","Name","Email","dpt","role","photo","settings_completed"]
+
 class TaskSerializer(ModelSerializer):
     class Meta:
         model=Task
-        fields="__all__"
+        fields=["id","staff","group","moved_from","number","task","description","date","status","completion_date","progress"]
+        read_only_fields=["staff","group","moved_from","date"]
 
 class DirectorsTaskSerializer(ModelSerializer):
     staff_name = serializers.CharField(source='staff.Name', read_only=True)

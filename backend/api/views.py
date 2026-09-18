@@ -1,3 +1,6 @@
+import hashlib
+import secrets
+from django.conf import settings
 from django.core.mail import send_mail
 from django.contrib.auth.hashers import check_password,make_password
 from django.contrib.admin.views.decorators import staff_member_required
@@ -6,6 +9,7 @@ from .models import Staff, Task as TaskModel, Admin, DirectorsTask, PasswordRese
 from django.utils import timezone
 from datetime import datetime, timedelta
 from django.db.models import Count
+from django.db.models.functions import Lower
 from .serializer import (
     SignupSerializer, StaffSerializer, LoginSerializer, TaskSerializer,
     AdminSerializer, AdminLoginSerializer, DirectorsTaskSerializer,
@@ -15,7 +19,6 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from uuid import uuid4
-import secrets
 import random
 import urllib.request
 
@@ -43,7 +46,7 @@ def apply_filter_search(queryset, request):
     if q:
         queryset = queryset.filter(task__icontains=q)
     filt = request.GET.get("filter", "")
-    today = timezone.now().date()
+    today = timezone.localtime().date()
     if filt == "day":
         queryset = queryset.filter(date=today)
     elif filt == "week":
@@ -81,31 +84,26 @@ class Signup(APIView):
 
     def post(self,request):
         serializer=SignupSerializer(data=request.data)
-        print(request.data)
         if serializer.is_valid():
           info=serializer.validated_data
         
           email=info.get("email")
           password=info.get("password")
-          role = info.get('role')
-          staff=Staff.objects.filter(Email=email).first()
+          staff=Staff.objects.filter(Email__iexact=email).first()
           if staff:
               return Response({"info":"User exists"},status=status.HTTP_302_FOUND)
-              
-        #   role = info.get('role')
+          
           staff=Staff.objects.create(
               Name=info.get('name'),
               Email=info.get('email'),
               dpt=info.get('dept'),
               password=make_password(password),
-              role=role
+              role='staff'
               
           )
         
-        
           return Response({"info":"Successful Signup","status":"You can navigate to the login page"},status=status.HTTP_201_CREATED)
         else:
-            # print(serializer.errors)
             return Response({"info":serializer.errors},status=status.HTTP_400_BAD_REQUEST)
             
             
@@ -136,9 +134,11 @@ class Login(APIView):
         info=serializer.validated_data
         email=info.get("email")
         password=info.get("password")
-        staff=Staff.objects.filter(Email=email).first()
+        staff=Staff.objects.filter(Email__iexact=email).first()
         if not staff:
             return Response({"info":"Staff not found"},status=status.HTTP_404_NOT_FOUND)
+        if not staff.password:
+            return Response({"info":"Password Unable to be Authenticated"},status=status.HTTP_401_UNAUTHORIZED)
         if not check_password(password,staff.password):
             return Response({"info":"Password Unable to be Authenticated"},status=status.HTTP_401_UNAUTHORIZED)
         auth_token=secrets.token_hex(32)
@@ -150,13 +150,13 @@ class Login(APIView):
         staff.refresh_created_at=timezone.now()
         staff.refresh_expire_at=timezone.now()+timedelta(days=60)
         staff.save()
-        response=Response({"info":"User Authenticated","role":staff.role,"dpt":staff.dpt},headers={"Authorization":auth_token},status=status.HTTP_201_CREATED)
+        response=Response({"info":"User Authenticated","role":staff.role,"dpt":staff.dpt,"settings_completed":staff.settings_completed,"name":staff.Name},headers={"Authorization":auth_token},status=status.HTTP_201_CREATED)
         response.set_cookie(
             key="refresh_cookie",
             value=refresh,
             httponly=True,
             samesite='Lax',
-            secure=False,)
+            secure=not settings.DEBUG,)
         return response
 
         
@@ -226,15 +226,12 @@ class ProfileUpdate(APIView):
         name=request.data.get("name")
         email=request.data.get("email")
         dept=request.data.get("dept")
-        role=request.data.get("role")
         if name:
             staff.Name=name
         if email:
             staff.Email=email
         if dept:
             staff.dpt=dept
-        if role:
-            staff.role=role
         staff.save()
         return Response({"info":"Profile updated","name":staff.Name,"email":staff.Email,"dept":staff.dpt,"role":staff.role,"photo":staff.photo},status=status.HTTP_200_OK)
 
@@ -245,8 +242,11 @@ class ProfilePhotoUpload(APIView):
         if not auth:
             return Response({"info":"Unable to Authenticate"},status=status.HTTP_400_BAD_REQUEST)
         staff=Staff.objects.filter(auth=auth).first()
+        admin=None
         if not staff:
-            return Response({"info":"Unable to Authenticate"},status=status.HTTP_400_BAD_REQUEST)
+            admin=Admin.objects.filter(auth=auth).first()
+            if not admin:
+                return Response({"info":"Unable to Authenticate"},status=status.HTTP_400_BAD_REQUEST)
         photo=request.FILES.get("photo")
         if not photo:
             return Response({"info":"No photo provided"},status=status.HTTP_400_BAD_REQUEST)
@@ -258,8 +258,12 @@ class ProfilePhotoUpload(APIView):
             return Response({"info":f"Upload to image host failed: {str(e)}"},status=status.HTTP_502_BAD_GATEWAY)
         if not uploaded_url.startswith("http"):
             return Response({"info":"Image host rejected the upload"},status=status.HTTP_502_BAD_GATEWAY)
-        staff.photo=uploaded_url
-        staff.save()
+        if staff:
+            staff.photo=uploaded_url
+            staff.save()
+        else:
+            admin.photo=uploaded_url
+            admin.save()
         return Response({"info":"Photo updated","photo":uploaded_url},status=status.HTTP_200_OK)
 
 
@@ -328,8 +332,11 @@ class Task(APIView):
             return Response({"info":"Task not found"},status=status.HTTP_404_NOT_FOUND)
         serializer=TaskSerializer(task, data=request.data, partial=True)
         if serializer.is_valid():
+            old_progress = task.progress
+            old_status = task.status
             serializer.save()
-            if task.moved_from and (
+            progress_changed = task.progress != old_progress or (task.status or "").strip().lower() != (old_status or "").strip().lower()
+            if task.moved_from and progress_changed and (
                 task.progress == "100%"
                 or (task.status or "").strip().lower() == "completed"
             ):
@@ -366,7 +373,7 @@ class TaskMoveView(APIView):
             return Response({"info":"Task not found"},status=status.HTTP_404_NOT_FOUND)
         if (task.status or "").strip().lower() == "completed":
             return Response({"info":"Completed tasks can't be moved"},status=status.HTTP_400_BAD_REQUEST)
-        today = timezone.now().date()
+        today = timezone.localtime().date()
         if TaskModel.objects.filter(moved_from=task, date=today).exists():
             return Response({"info":"This task was already moved to today"},status=status.HTTP_400_BAD_REQUEST)
         new_task = TaskModel.objects.create(
@@ -499,14 +506,16 @@ class AdminLogin(APIView):
             info=serializer.validated_data
             email=info.get("email")
             password=info.get("password")
-            admin=Admin.objects.filter(Email=email).first()
+            admin=Admin.objects.filter(Email__iexact=email).first()
             if not admin:
                 return Response({"info":"No admin found"},status=status.HTTP_404_NOT_FOUND)
+            if not admin.password:
+                return Response({"info":"Invalid credentials"},status=status.HTTP_401_UNAUTHORIZED)
             if check_password(password, admin.password):
                 token=secrets.token_hex(32)
                 admin.auth=token
                 admin.save()
-                return Response({"info":"Admin login successful"},headers={"Authorization":token},status=status.HTTP_200_OK)
+                return Response({"info":"Admin login successful","name":admin.Name,"settings_completed":admin.settings_completed},headers={"Authorization":token},status=status.HTTP_200_OK)
             return Response({"info":"Invalid credentials"},status=status.HTTP_401_UNAUTHORIZED)
         return Response({"info":serializer.errors},status=status.HTTP_400_BAD_REQUEST)
 
@@ -523,7 +532,7 @@ class AdminDashboard(APIView):
         
         dir_staff=[]
         normal_staff=[]
-        staffs=Staff.objects.all()
+        staffs=Staff.objects.annotate(name_lower=Lower("Name")).order_by("name_lower", "Name")
         for i in staffs:
             if i.role=="director":
                 dir_tasks=i.director_tasks.all()
@@ -550,11 +559,13 @@ class AdminDashboard(APIView):
         
         all_tasks = TaskModel.objects.all()
         total_tasks=all_tasks.count()
-        today = timezone.now().date()
+        today = timezone.localtime().date()
         tasks_today = all_tasks.filter(date=today).count()
         tasks_in_progress = all_tasks.exclude(status__in=["Completed", "completed"]).count()
         completed_tasks = all_tasks.filter(status__in=["Completed", "completed"]).count()
-        staff_list=StaffSerializer(Staff.objects.all(),many=True).data
+        staff_list=StaffSerializer(
+            Staff.objects.annotate(name_lower=Lower("Name")).order_by("name_lower", "Name"), many=True
+        ).data
         tasks_by_status=all_tasks.values("status").annotate(count=Count("id"))
         staff_task_counts=Staff.objects.annotate(task_count=Count("task")).values("Name","task_count")
 
@@ -582,13 +593,13 @@ class AdminStaffList(APIView):
         admin = Admin.objects.filter(auth=auth).first()
         if not admin:
             return Response({"info": "Invalid admin session"}, status=status.HTTP_401_UNAUTHORIZED)
-        date_param = request.GET.get("date") or str(timezone.now().date())
+        date_param = request.GET.get("date") or str(timezone.localtime().date())
         att_date = date_param
         try:
             att_date = timezone.datetime.strptime(date_param, "%Y-%m-%d").date()
         except ValueError:
-            att_date = timezone.now().date()
-        staff_list = Staff.objects.all().order_by("Name")
+            att_date = timezone.localtime().date()
+        staff_list = Staff.objects.annotate(name_lower=Lower("Name")).order_by("name_lower", "Name")
         attendances = {
             a.staff_id: a
             for a in Arrival.objects.filter(date=att_date)
@@ -717,7 +728,7 @@ class ForgotPasswordView(APIView):
         recipient = matched.Email if matched.Email else email
         PasswordResetOTP.objects.create(
             email=recipient,
-            otp=otp,
+            otp=hashlib.sha256(otp.encode()).hexdigest(),
             expires_at=timezone.now() + timedelta(minutes=10),
         )
 
@@ -732,8 +743,6 @@ class ForgotPasswordView(APIView):
         except Exception as e:
             return Response({"info": f"Failed to send email: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        print(f"[FORGOT-PASSWORD] OTP {otp} for {recipient} -> sent={bool(sent)}")
-
         return Response({"info":"OTP sent to your email"},status=status.HTTP_200_OK)
 
 
@@ -744,12 +753,21 @@ class VerifyOTPView(APIView):
             return Response({"info": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
         email = serializer.validated_data["email"]
         otp = serializer.validated_data["otp"]
+        otp_hash = hashlib.sha256(otp.encode()).hexdigest()
 
-        record = PasswordResetOTP.objects.filter(email=email, otp=otp, is_used=False).last()
+        record = PasswordResetOTP.objects.filter(email=email, is_used=False).last()
         if not record:
             return Response({"info":"Invalid OTP"},status=status.HTTP_400_BAD_REQUEST)
+        if record.attempts >= 5:
+            record.is_used = True
+            record.save()
+            return Response({"info":"Too many attempts. Please request a new OTP"},status=status.HTTP_400_BAD_REQUEST)
         if record.is_expired():
             return Response({"info":"OTP has expired"},status=status.HTTP_400_BAD_REQUEST)
+        if record.otp != otp_hash:
+            record.attempts += 1
+            record.save()
+            return Response({"info":"Invalid OTP"},status=status.HTTP_400_BAD_REQUEST)
 
         reset_token = secrets.token_hex(32)
         record.reset_token = reset_token
@@ -818,7 +836,7 @@ class AttendanceStatus(APIView):
         staff = authenticate_staff(request)
         if not staff:
             return Response({"info": "Unable to Authenticate"}, status=status.HTTP_400_BAD_REQUEST)
-        today = timezone.now().date()
+        today = timezone.localtime().date()
         record = Arrival.objects.filter(staff=staff, date=today).first()
         data = None
         if record:
@@ -836,12 +854,12 @@ class AttendanceCheckIn(APIView):
         staff = authenticate_staff(request)
         if not staff:
             return Response({"info": "Unable to Authenticate"}, status=status.HTTP_400_BAD_REQUEST)
-        today = timezone.now().date()
+        today = timezone.localtime().date()
         if Arrival.objects.filter(staff=staff, date=today).exists():
             return Response({"info": "Already checked in for today"}, status=status.HTTP_400_BAD_REQUEST)
         Arrival.objects.create(
             staff=staff,
-            time_of_arrival=timezone.now().time(),
+            time_of_arrival=timezone.localtime().time(),
             date=today,
             day=today.strftime("%A"),
         )
@@ -853,8 +871,8 @@ class AttendanceCheckOut(APIView):
         staff = authenticate_staff(request)
         if not staff:
             return Response({"info": "Unable to Authenticate"}, status=status.HTTP_400_BAD_REQUEST)
-        today = timezone.now().date()
-        now = timezone.now().time()
+        today = timezone.localtime().date()
+        now = timezone.localtime().time()
         record = Arrival.objects.filter(staff=staff, date=today).first()
         if record:
             record.time_of_leave = now
@@ -893,3 +911,80 @@ class AdminAttendanceHistory(APIView):
                 "time_of_leave": a.time_of_leave.strftime("%H:%M") if a.time_of_leave else None,
             })
         return Response({"info": "ok", "records": records}, status=status.HTTP_200_OK)
+
+
+class AccountSettings(APIView):
+    def _session(self, request):
+        auth = request.headers.get("Authorization")
+        if not auth:
+            return None, None
+        staff = Staff.objects.filter(auth=auth).first()
+        if staff:
+            return staff, "staff"
+        admin = Admin.objects.filter(auth=auth).first()
+        if admin:
+            return admin, "admin"
+        return None, None
+
+    def get(self, request):
+        acc, kind = self._session(request)
+        if not acc:
+            return Response({"info": "Unable to Authenticate"}, status=status.HTTP_400_BAD_REQUEST)
+        if kind == "staff":
+            return Response({
+                "kind": "staff",
+                "settings_completed": acc.settings_completed,
+                "name": acc.Name,
+                "email": acc.Email,
+                "dept": acc.dpt,
+                "role": acc.role,
+                "photo": acc.photo,
+            }, status=status.HTTP_200_OK)
+        return Response({
+            "kind": "admin",
+            "settings_completed": acc.settings_completed,
+            "name": acc.Name,
+            "email": acc.Email,
+            "photo": acc.photo,
+        }, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        acc, kind = self._session(request)
+        if not acc:
+            return Response({"info": "Unable to Authenticate"}, status=status.HTTP_400_BAD_REQUEST)
+        name = request.data.get("name")
+        email = request.data.get("email")
+        new_password = request.data.get("password")
+        if kind == "staff":
+            dept = request.data.get("dept")
+            payload = {"kind": "staff"}
+            if name:
+                acc.Name = name
+            if email:
+                acc.Email = email
+            if dept:
+                acc.dpt = dept
+        else:
+            payload = {"kind": "admin"}
+            if name:
+                acc.Name = name
+            if email:
+                acc.Email = email
+        if new_password:
+            acc.password = make_password(new_password)
+            acc.auth = None
+            if kind == "staff":
+                acc.refresh = None
+        acc.settings_completed = True
+        acc.save()
+        payload.update({
+            "info": "Settings saved",
+            "settings_completed": True,
+            "name": acc.Name,
+            "email": acc.Email,
+        })
+        if kind == "staff":
+            payload.update({"dept": acc.dpt, "role": acc.role, "photo": acc.photo})
+        else:
+            payload.update({"photo": acc.photo})
+        return Response(payload, status=status.HTTP_200_OK)

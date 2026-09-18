@@ -32,7 +32,7 @@ export default function AdminLogin() {
       router.push("/admin/dashboard");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (adminErr: any) {
-      if (adminErr.message?.toLowerCase().includes('not found')) {
+      if (adminErr.message && adminErr.message.toLowerCase().includes('no admin')) {
         try {
           const res = await api.login({ email, password });
           if (res.role) localStorage.setItem('user_role', res.role);

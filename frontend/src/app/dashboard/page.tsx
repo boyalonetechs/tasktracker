@@ -20,10 +20,11 @@ import {
   LogIn,
   LogOut,
 } from "lucide-react";
-import { api, formatDate } from "@/lib/api";
+import { api, formatDate, isAuthError } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import EmployeeShell from "@/components/EmployeeShell";
+import FirstLoginModal from "@/components/FirstLoginModal";
 
 export default function EmployeeDashboard() {
   const [activeView, setActiveView] = useState("dashboard");
@@ -42,6 +43,7 @@ export default function EmployeeDashboard() {
   const [taskProgress, setTaskProgress] = useState("10%");
   const [submitting, setSubmitting] = useState(false);
   const [displayName, setDisplayName] = useState("User");
+  const [photoUrl, setPhotoUrl] = useState("");
   const [taskSearch, setTaskSearch] = useState("");
   const [dateFilter, setDateFilter] = useState("");
   const [confirmMove, setConfirmMove] = useState(false);
@@ -53,6 +55,9 @@ export default function EmployeeDashboard() {
   const [attBusy, setAttBusy] = useState(false);
   const [attError, setAttError] = useState("");
   const [attSuccess, setAttSuccess] = useState("");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [accountSettings, setAccountSettings] = useState<any>(null);
+  const [showFirstLogin, setShowFirstLogin] = useState(false);
   const router = useRouter();
 
   const loadTasks = async (filter?: string, q?: string) => {
@@ -71,10 +76,7 @@ export default function EmployeeDashboard() {
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
-      if (
-        err.message?.includes("Authentication") ||
-        err.message?.includes("credentials")
-      ) {
+      if (isAuthError(err)) {
         router.push("/login");
       }
     } finally {
@@ -88,10 +90,7 @@ export default function EmployeeDashboard() {
       setAttendance(res.attendance);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
-      if (
-        err.message?.includes("Authentication") ||
-        err.message?.includes("credentials")
-      ) {
+      if (isAuthError(err)) {
         router.push("/login");
       }
     } finally {
@@ -138,6 +137,30 @@ export default function EmployeeDashboard() {
     if (savedName) setDisplayName(savedName);
     loadTasks();
     loadAttendance();
+    api
+      .getAccountSettings()
+      .then((res) => {
+        setAccountSettings(res);
+        if (res && res.settings_completed === false) {
+          setShowFirstLogin(true);
+        }
+        if (res) {
+          if (res.name) localStorage.setItem("user_name", res.name);
+          if (res.email) localStorage.setItem("user_email", res.email);
+          if (res.dept) localStorage.setItem("user_dept", res.dept);
+          if (res.role) localStorage.setItem("user_role", res.role);
+          if (res.photo) {
+            localStorage.setItem("user_photo", res.photo);
+            setPhotoUrl(res.photo);
+          }
+        }
+      })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .catch((err: any) => {
+        if (isAuthError(err)) {
+          router.push("/login");
+        }
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -229,11 +252,7 @@ export default function EmployeeDashboard() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       console.error(err);
-      if (
-        err.message?.includes("Authenticate") ||
-        err.message?.includes("credentials") ||
-        err.message?.includes("expired")
-      ) {
+      if (isAuthError(err)) {
         router.push("/login");
       }
     } finally {
@@ -319,6 +338,7 @@ export default function EmployeeDashboard() {
     const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     const newStatus = isCompleted ? "In Progress" : "Completed";
     const newProgress = isCompleted ? "10%" : "100%";
+    const prevTask = selectedTask;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     setSelectedTask((current: any) => {
       const nextSubtasks = (current.subtasks || []).map(
@@ -350,6 +370,7 @@ export default function EmployeeDashboard() {
         progress: newProgress,
       };
       if (!isCompleted) body.completion_date = today;
+      else body.completion_date = null;
       await api.updateTask(subtask.id, body);
       const siblings = (selectedTask?.subtasks || []).map(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -369,6 +390,7 @@ export default function EmployeeDashboard() {
       }
     } catch (err) {
       console.error(err);
+      if (prevTask) setSelectedTask(prevTask);
     }
   };
 
@@ -882,13 +904,10 @@ export default function EmployeeDashboard() {
                     </div>
                     <div className="w-48 flex items-center gap-2.5 border border-gray-200 rounded-lg px-3 py-1.5 bg-white">
                       <div className="w-6 h-6 rounded-full bg-[#003A47] flex items-center justify-center text-[10px] font-bold text-white uppercase tracking-wider overflow-hidden">
-                        {typeof window !== "undefined" &&
-                        window.localStorage.getItem("user_photo") ? (
+                        {photoUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
-                            src={
-                              window.localStorage.getItem("user_photo") || ""
-                            }
+                            src={photoUrl}
                             alt="me"
                             className="w-full h-full object-cover"
                           />
@@ -1176,6 +1195,22 @@ export default function EmployeeDashboard() {
           </div>
         )}
       </EmployeeShell>
+
+      <FirstLoginModal
+        open={showFirstLogin}
+        kind="staff"
+        initial={accountSettings}
+        onComplete={(data) => {
+          setShowFirstLogin(false);
+          if (data.name) localStorage.setItem("user_name", data.name);
+          if (data.email) localStorage.setItem("user_email", data.email);
+          if (data.photo) {
+            localStorage.setItem("user_photo", data.photo);
+            setPhotoUrl(data.photo);
+          }
+          loadTasks();
+        }}
+      />
     </AuthGuard>
   );
 }

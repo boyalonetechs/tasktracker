@@ -34,5 +34,7 @@ urlpatterns = [
     path("attendance/checkin/",views.AttendanceCheckIn.as_view(),name="attendance_checkin"),
     path("attendance/checkout/",views.AttendanceCheckOut.as_view(),name="attendance_checkout"),
     path("admin/attendance/",views.AdminAttendanceHistory.as_view(),name="admin_attendance_history"),
+
+    path("account/settings/",views.AccountSettings.as_view(),name="account_settings"),
     
 ]
