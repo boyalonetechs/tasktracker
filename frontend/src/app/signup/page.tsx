@@ -10,6 +10,7 @@ export default function SignUpPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [role, setRole] = useState("Full Stack Developer");
   const [dept, setDept] = useState("DPHUB");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -34,7 +35,7 @@ export default function SignUpPage() {
     }
     setLoading(true);
     try {
-      await api.signup({ name, email, password, dept });
+      await api.signup({ name, email, password, dept, role });
       router.push("/login");
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
@@ -105,31 +106,73 @@ export default function SignUpPage() {
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Department
-              </label>
-              <div className="relative">
-                <select
-                  value={dept}
-                  onChange={(e) => setDept(e.target.value)}
-                  className="w-full appearance-none px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#003A47] focus:border-[#003A47] pr-8 cursor-pointer"
-                  required
-                >
-                  <option value="DPHUB">Digital Productivity Hub</option>
-                  <option value="Business Department">
-                    Business Development
-                  </option>
-                  <option value="Corporate Engagement">
-                    Corporate Engagement
-                  </option>
-                  <option value="Social Ministry">Social Ministry</option>
-                  <option value="Career Education And Counseling Commission">
-                    Career Education And Counseling Commission (CECC)
-                  </option>
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
-                  <ChevronDown className="h-4 w-4" />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Role
+                </label>
+                <div className="relative">
+                  <select
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                    className="w-full appearance-none px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#003A47] focus:border-[#003A47] pr-8 cursor-pointer"
+                    required
+                  >
+                    <option value="Full Stack Developer">
+                      Full Stack Developer
+                    </option>
+                    <option value="Backend Developer">
+                      Backend Developer
+                    </option>
+                    <option value="Digital Marketer">Digital Marketer</option>
+                    <option value="Product Designer">Product Designer</option>
+                    <option value="Manager">Manager</option>
+                    <option value="Director">Director</option>
+                    <option value="VideoGrapher">VideoGrapher</option>
+                    <option value="Data Analyst">Data Analyst</option>
+                    <option value="Career Educator">Career Educator</option>
+                    <option value="Video Editor">Video Editor</option>
+                    <option value="Business Consultant">
+                      Business Consultant
+                    </option>
+                    <option value="Creative Designer">Creative Designer</option>
+                    <option value="Content Writer">Content Writer</option>
+                    <option value="Intern">Intern</option>
+                    <option value="Student">Student</option>
+                    <option value="Technical Officer">Technical Officer</option>
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
+                    <ChevronDown className="h-4 w-4" />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Department
+                </label>
+                <div className="relative">
+                  <select
+                    value={dept}
+                    onChange={(e) => setDept(e.target.value)}
+                    className="w-full appearance-none px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#003A47] focus:border-[#003A47] pr-8 cursor-pointer"
+                    required
+                  >
+                    <option value="DPHUB">Digital Productivity Hub</option>
+                    <option value="Business Department">
+                      Business Development
+                    </option>
+                    <option value="Corporate Engagement">
+                      Corporate Engagement
+                    </option>
+                    <option value="Social Ministry">Social Ministry</option>
+                    <option value="Career Education And Counseling Commission">
+                      Career Education And Counseling Commission (CECC)
+                    </option>
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
+                    <ChevronDown className="h-4 w-4" />
+                  </div>
                 </div>
               </div>
             </div>
