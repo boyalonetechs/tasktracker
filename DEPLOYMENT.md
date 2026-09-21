@@ -157,5 +157,6 @@ from `CORS_ALLOWED_ORIGINS` on the backend — that's an env fix, not a code fix
 | `Server Error (500)` on login API | `SECRET_KEY` / `ALLOWED_HOSTS` missing → set in Render env    |
 | API works, web shows CORS error   | add Vercel origin to `CORS_ALLOWED_ORIGINS` + redeploy        |
 | `DisallowedHost` after deploy     | `ALLOWED_HOSTS` missing the new Render host                   |
+| Frontend: `Expected JSON but received HTML or plain text` | Backend answered an HTML error page — usually the service URL isn't in `ALLOWED_HOSTS`. Set `ALLOWED_HOSTS` to your **actual** Render hostname (e.g. `tasktracker-ya4n.onrender.com`) — the real service name, not the example in `render.yaml`. |
 | Static (admin CSS) 404            | `collectstatic` didn't run → confirm `backend/build.sh` runs; Whitenoise serves `backend/staticfiles` |
 | Emails don't send                 | SMTP vars wrong; Render egress note: use `EMAIL_HOST_USER`/`EMAIL_HOST_PASSWORD` |

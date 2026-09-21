@@ -137,9 +137,7 @@ if DEBUG:
 else:
     CORS_ALLOWED_ORIGINS = [
         o.strip()
-        for o in (
-            os.getenv('CORS_ALLOWED_ORIGINS')
-        ).split(',')
+        for o in (os.getenv('CORS_ALLOWED_ORIGINS') or '').split(',')
         if o.strip()
     ]
     CSRF_TRUSTED_ORIGINS = [
