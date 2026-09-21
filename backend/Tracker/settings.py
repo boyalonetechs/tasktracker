@@ -12,11 +12,22 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = [
-    h.strip()
-    for h in (os.getenv('ALLOWED_HOSTS') or 'localhost').split(',')
-    if h.strip()
-]
+def _collect_allowed_hosts():
+    hosts = [
+        h.strip()
+        for h in (os.getenv('ALLOWED_HOSTS') or 'localhost').split(',')
+        if h.strip()
+    ]
+    render_url = os.getenv('RENDER_EXTERNAL_URL')
+    if render_url:
+        from urllib.parse import urlparse
+        host = urlparse(render_url).netloc
+        if host and host not in hosts:
+            hosts.append(host)
+    return hosts
+
+
+ALLOWED_HOSTS = _collect_allowed_hosts()
 
 INSTALLED_APPS = [
     'django.contrib.admin',

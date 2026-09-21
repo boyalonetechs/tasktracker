@@ -1,6 +1,4 @@
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  "https://tasktracker-ya4n.onrender.com";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function request<T = any>(
@@ -107,11 +105,10 @@ export const api = {
     progress?: string;
     completion_date?: string;
     list: { task: string; number: number; description?: string }[];
-  }) =>
-    request<{ info: string; id: number }>("/task/", {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
+  }) => request<{ info: string; id: number }>("/task/", {
+    method: "POST",
+    body: JSON.stringify(body),
+  }),
 
   updateTask: (
     id: number,
@@ -302,12 +299,7 @@ export function formatDate(dateStr: string | null | undefined): string {
 }
 
 export function isAuthError(err: unknown): boolean {
-  if (
-    err &&
-    typeof err === "object" &&
-    "auth" in err &&
-    (err as { auth?: boolean }).auth
-  ) {
+  if (err && typeof err === "object" && "auth" in err && (err as { auth?: boolean }).auth) {
     return true;
   }
   if (err instanceof Error) {
