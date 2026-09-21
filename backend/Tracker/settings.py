@@ -134,6 +134,7 @@ EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'True') == 'True'
 EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS') == 'True'
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER') 
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')  
+EMAIL_TIMEOUT = int(os.getenv('EMAIL_TIMEOUT') or 15)  
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL') or (f"Leadpath Tasktracker <{EMAIL_HOST_USER}>" if EMAIL_HOST_USER else 'Leadpath Tasktracker <noreply@leadpathgroup.com>')  
 
 
