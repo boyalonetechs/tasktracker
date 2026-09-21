@@ -98,7 +98,7 @@ class Signup(APIView):
               Email=info.get('email'),
               dpt=info.get('dept'),
               password=make_password(password),
-              role='staff'
+              role=info.get('role') or 'staff'
               
           )
         
