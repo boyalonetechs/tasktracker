@@ -7,6 +7,16 @@ services:
     plan: free
     rootDir: backend
     healthCheckPath: /api/account/settings/
+    buildCommand: |
+      cd backend && python3 -m venv .venv && \
+      ./.venv/bin/pip install --upgrade pip && \
+      ./.venv/bin/pip install -r requirements.txt && \
+      ./.venv/bin/python manage.py migrate --noinput && \
+      ./.venv/bin/python manage.py collectstatic --noinput && \
+      ./.venv/bin/python manage.py check
+    startCommand: |
+      ./.venv/bin/gunicorn Tracker.wsgi:application \
+        --bind 0.0.0.0:$PORT --workers 2 --timeout 120
     envVars:
       - key: DEBUG
         value: "False"
