@@ -19,6 +19,7 @@ import {
   Clock,
   LogIn,
   LogOut,
+  Trash2,
 } from "lucide-react";
 import { api, formatDate, isAuthError } from "@/lib/api";
 import { useRouter } from "next/navigation";
@@ -49,6 +50,8 @@ export default function EmployeeDashboard() {
   const [confirmMove, setConfirmMove] = useState(false);
   const [movingTask, setMovingTask] = useState(false);
   const [moveError, setMoveError] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [attendance, setAttendance] = useState<any>(null);
   const [attLoading, setAttLoading] = useState(true);
@@ -274,6 +277,7 @@ export default function EmployeeDashboard() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setConfirmMove(false);
     setMoveError("");
+    setConfirmDeleteId(null);
   }, [selectedTask]);
 
   const getTodayStr = () => {
@@ -313,6 +317,26 @@ export default function EmployeeDashboard() {
       setConfirmMove(false);
     } finally {
       setMovingTask(false);
+    }
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleDeleteTask = async (task: any) => {
+    if (confirmDeleteId !== task.id) {
+      setConfirmDeleteId(task.id);
+      return;
+    }
+    setDeletingId(task.id);
+    try {
+      await api.deleteTask(task.id);
+      if (selectedTask?.id === task.id) setSelectedTask(null);
+      setConfirmDeleteId(null);
+      loadTasks();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (err: any) {
+      console.error(err);
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -662,6 +686,7 @@ export default function EmployeeDashboard() {
                             <th className="py-3 px-6">Task Submitted</th>
                             <th className="py-3 px-6">Status</th>
                             <th className="py-3 px-6">Progress</th>
+                            <th className="py-3 px-6"></th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100 text-xs font-medium text-gray-600">
@@ -700,6 +725,29 @@ export default function EmployeeDashboard() {
                               </td>
                               <td className="py-3.5 px-6 text-gray-900 font-semibold">
                                 {item.progress || "-"}
+                              </td>
+                              <td className="py-3.5 px-6 text-right">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteTask(item);
+                                  }}
+                                  className={`inline-flex items-center gap-1.5 text-xs font-semibold transition-colors ${
+                                    confirmDeleteId === item.id
+                                      ? "text-white bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-lg"
+                                      : "text-red-500 hover:text-red-700"
+                                  }`}
+                                  disabled={deletingId === item.id}
+                                >
+                                  {deletingId === item.id ? (
+                                    <Loader className="w-3.5 h-3.5 animate-spin" />
+                                  ) : confirmDeleteId === item.id ? (
+                                    "Confirm?"
+                                  ) : (
+                                    <Trash2 className="w-4 h-4 stroke-[1.5]" />
+                                  )}
+                                </button>
                               </td>
                             </tr>
                           ))}
@@ -740,6 +788,27 @@ export default function EmployeeDashboard() {
                                 {item.status || "In progress"}
                               </span>
                             </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteTask(item);
+                              }}
+                              className={`shrink-0 text-xs font-semibold transition-colors ${
+                                confirmDeleteId === item.id
+                                  ? "text-white bg-red-600 hover:bg-red-700 px-2.5 py-1 rounded-lg"
+                                  : "text-red-500 hover:text-red-700"
+                              }`}
+                              disabled={deletingId === item.id}
+                            >
+                              {deletingId === item.id ? (
+                                <Loader className="w-3.5 h-3.5 animate-spin" />
+                              ) : confirmDeleteId === item.id ? (
+                                "Confirm?"
+                              ) : (
+                                <Trash2 className="w-4 h-4 stroke-[1.5]" />
+                              )}
+                            </button>
                           </div>
 
                           <div className="grid grid-cols-2 gap-1.5 text-xs">
@@ -785,13 +854,33 @@ export default function EmployeeDashboard() {
                   {formatDate(selectedTask.date || selectedTask.date_submitted)}
                   .{" "}
                 </span>
-                <button
-                  onClick={() => handleEditTask(selectedTask)}
-                  className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-[#003A47] hover:text-[#002b35] transition-colors"
-                >
-                  <Pencil className="w-3 h-3 stroke-[1.5]" />
-                  Edit
-                </button>
+                <div className="ml-auto flex items-center gap-3">
+                  <button
+                    onClick={() => handleEditTask(selectedTask)}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-[#003A47] hover:text-[#002b35] transition-colors"
+                  >
+                    <Pencil className="w-3 h-3 stroke-[1.5]" />
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDeleteTask(selectedTask)}
+                    disabled={deletingId === selectedTask.id}
+                    className={`flex items-center gap-1.5 text-xs font-semibold transition-colors ${
+                      confirmDeleteId === selectedTask.id
+                        ? "bg-red-600 text-white px-3 py-1.5 rounded-lg hover:bg-red-700"
+                        : "text-red-500 hover:text-red-700"
+                    }`}
+                  >
+                    {deletingId === selectedTask.id ? (
+                      <Loader className="w-3 h-3 animate-spin" />
+                    ) : confirmDeleteId === selectedTask.id ? (
+                      "Confirm? "
+                    ) : (
+                      <Trash2 className="w-3 h-3 stroke-[1.5]" />
+                    )}
+                    Delete
+                  </button>
+                </div>
               </div>
 
               <div className="p-6 space-y-6">

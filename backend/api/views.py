@@ -347,6 +347,18 @@ class Task(APIView):
             return Response({"info":"Task updated"},status=status.HTTP_200_OK)
         return Response({"info":serializer.errors},status=status.HTTP_400_BAD_REQUEST)
 
+    def delete(self, request, id):
+        staff = authenticate_staff(request)
+        if not staff:
+            return Response({"info":"Unable to Authenticate"},status=status.HTTP_400_BAD_REQUEST)
+        task = TaskModel.objects.filter(id=id, staff=staff).first()
+        if not task:
+            return Response({"info":"Task not found"},status=status.HTTP_404_NOT_FOUND)
+        if task.group_id is None:
+            TaskModel.objects.filter(group=task).delete()
+        task.delete()
+        return Response({"info":"Task deleted"},status=status.HTTP_200_OK)
+
 
 class TaskMoveView(APIView):
     def post(self, request, id):

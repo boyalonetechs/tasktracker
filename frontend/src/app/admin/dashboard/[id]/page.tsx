@@ -642,7 +642,7 @@ export default function StaffProfilePage({
                                 className={`text-sm font-semibold ${
                                   subtask.status === "Completed" ||
                                   subtask.status === "completed"
-                                    ? "text-gray-400 line-through"
+                                    ? "text-gray-400"
                                     : "text-gray-900"
                                 }`}
                               >

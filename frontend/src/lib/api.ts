@@ -127,6 +127,9 @@ export const api = {
       method: "POST",
     }),
 
+  deleteTask: (id: number) =>
+    request<{ info: string }>(`/task/${id}/`, { method: "DELETE" }),
+
   getAttendance: () =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     request<any>("/attendance/", { method: "GET" }),
